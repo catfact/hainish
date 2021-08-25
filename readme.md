@@ -15,3 +15,4 @@ TODO:
 - crush/distort (pre/post reson)
 - finish params / better params / better defaults
 - save/load param data
+- would be nice to reduce/clean up module boilerplace

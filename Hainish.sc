@@ -13,7 +13,7 @@ Hainish {
 
 	*initClass {
 		moduleKeys = [
-			\bass, \voice, \resonator, \chorus
+			\lfo, \bass, \voice, \resonator, \chorus
 		];
 	}
 
@@ -38,6 +38,10 @@ Hainish {
 			groups[k] = Group.new(server, addAction:\addToTail);
 		});
 
+		// modulation source
+		modules[\lfo] = Hainish_Lfo.new(server, groups[\lfo], numUpperVoices.max(numBassVoices));
+		controls[\lfo] = modules[\lfo].ctlBus;
+
 		// voice modules
 		// these are arrays which share control bus data (a Dictionary)
 		// so we construct the busses first (using non-obvious factory class methods)
@@ -48,11 +52,15 @@ Hainish {
 		controls[\voice] = Hainish_VoiceOsc.controls;
 		controls[\bass]  = Hainish_BassOsc.controls;
 
-		modules[\bass] = Array.fill(numBassVoices, {
-			Hainish_BassOsc.new(groups[\bass], sources[\bass], controls[\bass])
+		modules[\bass] = Array.fill(numBassVoices, { arg i;
+			var busIdx = modules[\lfo].outBus.subBus(i).index;
+			busIdx.postln;
+			Hainish_BassOsc.new(groups[\bass], sources[\bass], controls[\bass], busIdx)
 		});
-		modules[\voice] = Array.fill(numUpperVoices, {
-			Hainish_VoiceOsc(groups[\voice], sources[\voice], controls[\voice])
+		modules[\voice] = Array.fill(numUpperVoices, { arg i;
+			var busIdx = modules[\lfo].outBus.subBus(i).index;
+			busIdx.postln;
+			Hainish_VoiceOsc(groups[\voice], sources[\voice], controls[\voice], busIdx)
 		});
 
 		// FX modules
@@ -258,10 +266,12 @@ Hainish_VoiceOsc {
 				\shape, ControlSpec.new(0.999, 0.001, \exponential),
 				\detune, ControlSpec.new(0, 100, units:\cents, default:4),
 				\spread, ControlSpec.new(0, 1, default:1),
+				\modTune, ControlSpec.new(0, 100, units:\cents, default:0),
+				\modAmp, ControlSpec.new(0, 1, default:0),
 
-				\attack, ControlSpec.new(0.001, 16,\exponential, units:\s, default:0.2),
+				\attack, ControlSpec.new(0.001, 16,\exponential, units:\s, default:1.2),
 				\decay, ControlSpec.new(0.001, 16,\exponential, units:\s, default:1.1),
-				\sustain, ControlSpec.new(0, 1, default:1.0),
+				\sustain, ControlSpec.new(0, 1, default:0.6),
 				\release, ControlSpec.new(0.001, 16,\exponential, units:\s, default:2.0)
 			]);
 		});
@@ -280,18 +290,21 @@ Hainish_VoiceOsc {
 	}
 
 	// `controls` should be a structure returned by *controls
-	*new { arg target, output, controls;
-		^super.new.init(target, output, controls);
+	*new { arg target, output, controls, modIn;
+		^super.new.init(target, output, controls, modIn);
 	}
 
 	// `controls` should be a structure returned by *controls
-	init { arg target, output, controls;
+	init { arg target, output, controls, modIn;
 
 		synth = {
 			arg gate=0, hz=110, fastGate=1;
 			var osc, aosc, aenv, snd;
+			var mod, amp, ampMod, tuneMod;
 			var ctl;
 			var a;
+
+			mod = In.ar(modIn);
 
 			ctl = Dictionary.new;
 			controls.keys.do({ arg k;
@@ -304,14 +317,18 @@ Hainish_VoiceOsc {
 			);
 			aenv = aenv * EnvGen.ar(Env.asr(0, 1, 0.01), fastGate);
 
-			osc = Saw.ar(hz * (ctl[\detune] * [-0.01, 0.01]).midiratio);
+			tuneMod = mod * ctl[\modTune] * 0.01;
+			osc = Saw.ar(hz * (tuneMod + (ctl[\detune] * [-0.01, 0.01])).midiratio);
 			osc = LPF.ar(osc, ctl[\aaFc]);
 			aosc = osc.abs;
 			a = ctl[\shape];
 			osc = osc * (aosc + a) / (osc * osc + (a-1) * aosc + 1);
 
 			snd = Pan2.ar(osc[0], -1 * ctl[\spread]) +  Pan2.ar(osc[1], ctl[\spread]);
-			snd = snd * aenv;
+
+			ampMod = mod*0.5 + 0.5;
+			amp = SelectX.ar(ctl[\modAmp], [aenv, aenv*ampMod]);
+			snd = snd * amp;
 
 			Out.ar(output, snd);
 		}.play(target:target);
@@ -355,6 +372,7 @@ classvar prSpecs;
 				\fmShape, ControlSpec.new(0, 1, default:0),
 
 				\lpfFcRatio, ControlSpec.new(1, 16, \exponential, default:4),
+				\lpfFcMod, ControlSpec.new(0, 1, default:0),
 				\lpfGain, ControlSpec.new(0, 4, default:1),
 
 				\attack, ControlSpec.new(0.001, 16,\exponential, units:\s, default:0.2),
@@ -378,18 +396,19 @@ classvar prSpecs;
 	}
 
 	// `controls` should be a structure returned by *controls
-	*new { arg target, output, controls;
-		^super.new.init(target, output, controls);
+	*new { arg target, output, controls, modIn;
+		^super.new.init(target, output, controls, modIn);
 	}
 
 	// `controls` should be a structure returned by *controls
-	init { arg target, output, controls;
+	init { arg target, output, controls, modIn;
 
 		synth = {
 			arg gate=0, hz=110, fastGate=1;
 			var pulse, osc, aosc, aenv, snd;
 			var ctl;
 			var a;
+			var fc;
 
 			ctl = Dictionary.new;
 			controls.keys.do({ arg k;
@@ -405,9 +424,12 @@ classvar prSpecs;
 			aosc = osc.abs;
 			a = ctl[\fmShape];
 			osc = osc * (aosc + a) / (osc * osc + (a-1) * aosc + 1) * ctl[\fmLevel];
-
 			snd = osc + Pulse.ar(hz * ctl[\pulseRatio], ctl[\pulseWidth], ctl[\pulseLevel]);
-			snd = MoogFF.ar(snd, (ctl[\lpfFcRatio]*hz).min(12000), ctl[\lpfGain]);
+
+			fc = K2A.ar((ctl[\lpfFcRatio]*hz).min(12000));
+			fc = SelectX.ar(ctl[\lpfFcMod], [fc, (fc * In.ar(modIn)*0.5 + 0.5).max(10)]);
+
+			snd = MoogFF.ar(snd, fc, ctl[\lpfGain]);
 			snd = snd * aenv;
 
 			Out.ar(output, snd.dup);
@@ -501,6 +523,72 @@ Hainish_Resonator {
 
 			Out.ar(outBus.index, snd*0.3);
 
+		}.play(target);
+	}
+
+
+	setControlRaw { arg k, val;
+		var busIdxOffset = ctlBusIdx[k] - ctlBus.index;
+		ctlBus.subBus(busIdxOffset).set(val);
+	}
+
+	setControlMapped { arg k, val;
+		var busIdxOffset = ctlBusIdx[k] - ctlBus.index;
+		var mappedVal = this.class.specs[k].map(val);
+		ctlBus.subBus(busIdxOffset).set(val);
+	}
+
+}
+
+Hainish_Lfo {
+classvar prSpecs;
+	var <synth, <outBus;
+	var <ctlBus, <ctlBusIdx;
+
+	*specs {
+		if (prSpecs.isNil, {
+			var gainDbSpec = ControlSpec.new(-6.0, 6.0, default:0, units:\dB);
+			var satSpec = ControlSpec.new(0.01, 0.95, default:0.95);
+			prSpecs = Dictionary.newFrom([
+				\hz, ControlSpec(0.01, 100, default:1.2, units:\Hz),
+				\shape, ControlSpec(0, 1, default:0),
+				\phaseSpread, ControlSpec(0, 1, default:1)
+			]);
+		});
+		prSpecs.postln;
+		^prSpecs
+	}
+
+	*new {
+		arg server, target, n;
+		^super.new.init(server, target, n);
+	}
+
+	init {
+		arg server, target, n;
+
+		var specs = this.class.specs;
+
+		if (server.isNil, { server = Server.default; });
+		if (target.isNil, { target = server; });
+
+		ctlBus = Bus.control(server, specs.size);
+		ctlBusIdx = Dictionary.new;
+
+		specs.keys.do({ arg k, i;
+			[k, i].postln;
+			ctlBusIdx[k] = ctlBus.index + i;
+			ctlBus.subBus(i).set(specs[k].default);
+		});
+
+		outBus = Bus.audio(server, n);
+
+		synth = {
+			var ctl, lfo;
+			ctl = Dictionary.new;
+			ctlBusIdx.keys.do({ arg k; ctl[k] = In.kr(ctlBusIdx[k]).lag(0.1); });
+			lfo = Array.fill(n, {|i| SinOsc.ar(ctl[\hz], i.linlin(0, n-1, 0, pi) * ctl[\phaseSpread])});
+			Out.ar(outBus.index, lfo);
 		}.play(target);
 	}
 
