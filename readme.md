@@ -9,7 +9,6 @@ TODO:
 
 - docs!
 - norns engine!
-- LFO (-> bass FC, tremolo, vibrato)
 - noise source (-> resonator -> chorus)
 - extern input (-> resonator -> chorus)
 - crush/distort (pre/post reson)
