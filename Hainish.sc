@@ -13,7 +13,7 @@ Hainish {
 
 	*initClass {
 		moduleKeys = [
-			\lfo, \bass, \voice, \resonator, \chorus
+			\lfo, \bass, \voice, \resonator, \delay
 		];
 	}
 
@@ -42,13 +42,11 @@ Hainish {
 		modules[\lfo] = Hainish_Lfo.new(server, groups[\lfo], numUpperVoices.max(numBassVoices));
 		controls[\lfo] = modules[\lfo].ctlBus;
 
+		sources[\voice] = Bus.audio(server, 2);
+		sources[\bass]  = Bus.audio(server, 2);
 		// voice modules
 		// these are arrays which share control bus data (a Dictionary)
 		// so we construct the busses first (using non-obvious factory class methods)
-
-		sources[\voice] = Bus.audio(server, 2);
-		sources[\bass]  = Bus.audio(server, 2);
-
 		controls[\voice] = Hainish_VoiceOsc.controls;
 		controls[\bass]  = Hainish_BassOsc.controls;
 
@@ -66,15 +64,15 @@ Hainish {
 		// FX modules
 		// don't share, so each instance constructs its own control bus dict
 		modules[\resonator]  = Hainish_Resonator(server, groups[\resonator]);
-		modules[\chorus]     = Hainish_Chorus(server, groups[\chorus], 3, 16.0);
+		modules[\delay]     = Hainish_Delay(server, groups[\delay], 3, 16.0);
 		controls[\resonator] = modules[\resonator].ctlBus;
-		controls[\chorus]    = modules[\chorus].ctlBus;
+		controls[\delay]    = modules[\delay].ctlBus;
 
 		sources[\resonator] = modules[\resonator].outBus;
-		sources[\chorus]    = modules[\chorus].outBus;
+		sources[\delay]    = modules[\delay].outBus;
 
 		sinks[\resonator] = modules[\resonator].inBus;
-		sinks[\chorus]    = modules[\chorus].inBus;
+		sinks[\delay]    = modules[\delay].inBus;
 		sinks[\output]     = Bus.audio(server, 2);
 
 		// patch points, and a dict of level controls
@@ -90,31 +88,31 @@ Hainish {
 		};
 
 		addPatch.value(\voice,     \resonator, 1.0 / numUpperVoices);
-		addPatch.value(\resonator, \chorus);
-		addPatch.value(\bass,      \chorus, 0.2);
+		addPatch.value(\resonator, \delay);
+		addPatch.value(\bass,      \delay, 0.2);
 
 		addPatch.value(\bass,      \output, 0.2);
 		addPatch.value(\resonator, \output, 0.6);
-		addPatch.value(\chorus,    \output, 2.0);
+		addPatch.value(\delay,    \output, 2.0);
 
 		//------------------------------
-		/// "chorus" feedback
-		//// FIXME: should just put this in the chorus module...
+		/// "delay" feedback
+		//// FIXME: should just put this in the delay module...
 
-		controls[\chorusFb] = Dictionary.new;
-		controls[\chorusFb][\amt] = Bus.control(server, 1).set(0.2);
-		controls[\chorusFb][\lpfFc] = Bus.control(server, 1).set(7500);
-		controls[\chorusFb][\hpfFc] = Bus.control(server, 1).set(80);
+		controls[\delayFb] = Dictionary.new;
+		controls[\delayFb][\amt] = Bus.control(server, 1).set(0.6);
+		controls[\delayFb][\lpfFc] = Bus.control(server, 1).set(7500);
+		controls[\delayFb][\hpfFc] = Bus.control(server, 1).set(80);
 
-		patches[\chorus_feedback] = {
+		patches[\delay_feedback] = {
 			var snd, amp, lpfFc, hpfFc;
-			amp = In.kr(controls[\chorusFb][\amt]).lag(0.1);
-			lpfFc = In.kr(controls[\chorusFb][\lpfFc]).lag(0.1);
-			hpfFc = In.kr(controls[\chorusFb][\hpfFc]).lag(0.1);
-			snd = InFeedback.ar(sources[\chorus], 2);
+			amp = In.kr(controls[\delayFb][\amt]).lag(0.1);
+			lpfFc = In.kr(controls[\delayFb][\lpfFc]).lag(0.1);
+			hpfFc = In.kr(controls[\delayFb][\hpfFc]).lag(0.1);
+			snd = InFeedback.ar(sources[\delay], 2);
 			snd = HPF.ar(LPF.ar(snd, lpfFc), hpfFc);
-			Out.ar(sinks[\chorus], snd * amp);
-		}.play(groups[\chorus], addAction:\addToHead);
+			Out.ar(sinks[\delay], snd * amp);
+		}.play(groups[\delay], addAction:\addToHead);
 
 		//------------------------------
 
@@ -127,8 +125,8 @@ Hainish {
 }
 
 //////////////////////
-/// chorus module
-Hainish_Chorus {
+/// delay module
+Hainish_Delay {
 	classvar prSpecs;
 	var <bufs, <synth;
 	var <inBus, <outBus;
@@ -464,19 +462,19 @@ Hainish_Resonator {
 			var satSpec = ControlSpec.new(0.01, 0.95, default:0.95);
 			prSpecs = Dictionary.newFrom([
 				\mode1, ControlSpec.new(0, 2, default:0, step:1),
-				\fc1,   ControlSpec.new(60, 300, \exponential, default:150, units:\Hz),
+				\fc1,   ControlSpec.new(30, 1800, \exponential, default:150, units:\Hz),
 				\q1,    ControlSpec.new(0.0, 1.0, default:0.0),
 				\gain1, gainDbSpec,
 				\sat1,  satSpec,
 
 				\mode2, ControlSpec.new(0, 2, default:2, step:1),
-				\fc2,   ControlSpec.new(300, 1500, \exponential, default:900, units:\Hz),
+				\fc2,   ControlSpec.new(150, 3000, \exponential, default:900, units:\Hz),
 				\q2,    ControlSpec.new(0.0, 1.0, default:0.0),
 				\gain2, gainDbSpec,
 				\sat2,  satSpec,
 
 				\mode3, ControlSpec.new(0, 2, default:1, step:1),
-				\fc3,   ControlSpec.new(1500, 7500, \exponential, default:3000, units:\Hz),
+				\fc3,   ControlSpec.new(900, 9000, \exponential, default:3000, units:\Hz),
 				\q3,    ControlSpec.new(0.0, 1.0, default:0.0),
 				\gain3, gainDbSpec,
 				\sat3,  satSpec,

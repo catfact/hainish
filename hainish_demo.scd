@@ -83,7 +83,7 @@ h.numUpperVoices.do({|i| ~upperAvail.add(i) });
 };
 
 ~bassNoteOn = { arg num, vel;
-//	~notesHeld.postln;
+	//	~notesHeld.postln;
 	var isBass = (~notesHeld.size < 1) || (num <= ~notesHeld.asArray[0]);
 	if (isBass, {
 		postln("iz bazz: "++num);
@@ -122,55 +122,84 @@ MIDIdef.noteOff(\hainish_noteoff, {arg vel, num;
 //-----------------
 //--- test UI
 
-w = Window.new("hainish", Rect(100, Window.screenBounds.height-500, 400, 300), scroll:true);
+~gui_row_bounds = 444@28;
+
+w = Window.new("hainish", Rect(100, Window.screenBounds.height-700, 444, 666), scroll:true);
 q = w.addFlowLayout(10@10,20@5);
 /*
 FlowLayout
 */
-StaticText(w, 380@18).background_(Color.gray).string_("UPPER OSC");
+StaticText(w, ~gui_row_bounds ).background_(Color.gray).string_("UPPER OSC");
 ~voiceSpecs = Hainish_VoiceOsc.specs;
 ~voiceSpecs.keys.do ({ arg k;
-	EZSlider(w, 380@18, k, ~voiceSpecs[k], { arg sl;
+	EZSlider(w, ~gui_row_bounds, k, ~voiceSpecs[k], { arg sl;
 		[k, sl.value].postln;
 		h.controls[\voice][k].set(sl.value);
 	});
 });
 
-StaticText(w, 380@18).background_(Color.gray).string_("BASS OSC");
+StaticText(w, ~gui_row_bounds ).background_(Color.gray).string_("BASS OSC");
 ~bassSpecs = Hainish_BassOsc.specs;
 ~bassSpecs.keys.do ({ arg k;
-	EZSlider(w, 380@18, k, ~bassSpecs[k], { arg sl;
+	EZSlider(w, ~gui_row_bounds , k, ~bassSpecs[k], { arg sl;
 		[k, sl.value].postln;
 		h.controls[\bass][k].set(sl.value);
 	});
 });
 
-StaticText(w, 380@18).background_(Color.gray).string_("RESONATOR");
-~resoSpecs = Hainish_Resonator.specs;
-~resoSpecs.keys.do ({ arg k;
-	EZSlider(w, 380@18, k, ~resoSpecs[k], { arg sl;
+StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("RESONATOR");
+~resoSpecKeys=
+[
+	\mode1,
+	\gain1,
+	\fc1,
+	\q1,
+	\sat1,
+	\mode2,
+	\gain2,
+	\fc2,
+	\q2,
+	\sat2,
+	\mode3,
+	\gain3,
+	\fc3,
+	\q3,
+	\sat3,
+];//.do({ arg k; ~resoSpecs[k] = Hainish_Resonator.specs[k] });
+~resoSpecKeys.do ({ arg k;
+	EZSlider(w, ~gui_row_bounds, k,  Hainish_Resonator.specs[k], { arg sl;
 		[k, sl.value].postln;
 		h.modules[\resonator].setControlRaw(k, sl.value);
 	});
 });
 
-StaticText(w, 380@18).background_(Color.gray).string_("CHORUS");
-~chorusSpecs = Hainish_Chorus.specs;
-~chorusSpecs.keys.do ({ arg k;
-	EZSlider(w, 380@18, k, ~chorusSpecs[k], { arg sl;
+StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("CHORUS");
+~delaySpecs = Hainish_Delay.specs;
+~delaySpecs.keys.do ({ arg k;
+	EZSlider(w, ~gui_row_bounds, k, ~delaySpecs[k], { arg sl;
 		[k, sl.value].postln;
-		h.modules[\chorus].setControlRaw(k, sl.value);
+		h.modules[\delay].setControlRaw(k, sl.value);
 	});
 });
 
-StaticText(w, 380@18).background_(Color.gray).string_("LEVELS");
+StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("LEVELS");
 ~levelCtl = h.controls[\patches];
 ~levelCtl.keys.do ({ arg k;
-	EZSlider(w, 380@18, k, ControlSpec(-60, 0), { arg sl;
+	EZSlider(w, ~gui_row_bounds, k, ControlSpec(-60, 0), { arg sl;
 		[k, sl.value].postln;
 		~levelCtl[k].set(sl.value.dbamp);
 	});
 });
+
+
+// extra feedback controls (FIXME, shouldn't need special treatment)
+~delayFbCtl = h.controls[\delayFb];
+EZSlider(w, ~gui_row_bounds, \fbAmt, ControlSpec(-60, 0), { arg sl; ~delayFbCtl[\amt].set(sl.value.dbamp) });
+EZSlider(w, ~gui_row_bounds, \fbLfpFc, ControlSpec(10, 12000, warp:\exponential, default:8000),
+	{ arg sl; ~delayFbCtl[\lpfFc].set(sl.value) });
+EZSlider(w, ~gui_row_bounds, \fbHpfFc, ControlSpec(10, 12000, warp:\exponential, default:200),
+	{ arg sl; ~delayFbCtl[\hpfFc].set(sl.value) });
+
 
 
 w.front;
