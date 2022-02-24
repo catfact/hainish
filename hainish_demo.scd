@@ -165,7 +165,7 @@ StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("RESONATOR");
 	\fc3,
 	\q3,
 	\sat3,
-];//.do({ arg k; ~resoSpecs[k] = Hainish_Resonator.specs[k] });
+];
 ~resoSpecKeys.do ({ arg k;
 	EZSlider(w, ~gui_row_bounds, k,  Hainish_Resonator.specs[k], { arg sl;
 		[k, sl.value].postln;
@@ -174,31 +174,52 @@ StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("RESONATOR");
 });
 
 StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("CHORUS");
-~delaySpecs = Hainish_Delay.specs;
-~delaySpecs.keys.do ({ arg k;
-	EZSlider(w, ~gui_row_bounds, k, ~delaySpecs[k], { arg sl;
+~delaySpecKeys = [/*
+	Hainish_Delay.specs.keys.do({|k|k.postln})
+	*/
+	\baseTime,
+	\modTime,
+	\lfoHz,
+	\lfoB,
+	\lfoA,
+	\decay,
+	\spread
+];
+~delaySpecKeys.do ({ arg k;
+	EZSlider(w, ~gui_row_bounds, k, Hainish_Delay.specs[k], { arg sl;
 		[k, sl.value].postln;
 		h.modules[\delay].setControlRaw(k, sl.value);
 	});
 });
 
 StaticText(w, ~gui_row_bounds).background_(Color.gray).string_("LEVELS");
-~levelCtl = h.controls[\patches];
-~levelCtl.keys.do ({ arg k;
+~levelCtlKeys = [ /*
+	h.controls[\patches].keys.do({|k| ("\\"++k++",").postln;});
+	*/
+	\resonator_output,
+	\bass_output,
+	\delay_output,
+	\resonator_delay,
+	\bass_delay,
+	//\voice_resonator,
+];
+
+~levelCtlKeys.do ({ arg k;
 	EZSlider(w, ~gui_row_bounds, k, ControlSpec(-60, 0), { arg sl;
 		[k, sl.value].postln;
-		~levelCtl[k].set(sl.value.dbamp);
+		h.controls[\patches][k].set(sl.value.dbamp);
 	});
 });
 
 
 // extra feedback controls (FIXME, shouldn't need special treatment)
 ~delayFbCtl = h.controls[\delayFb];
-EZSlider(w, ~gui_row_bounds, \fbAmt, ControlSpec(-60, 0), { arg sl; ~delayFbCtl[\amt].set(sl.value.dbamp) });
-EZSlider(w, ~gui_row_bounds, \fbLfpFc, ControlSpec(10, 12000, warp:\exponential, default:8000),
-	{ arg sl; ~delayFbCtl[\lpfFc].set(sl.value) });
-EZSlider(w, ~gui_row_bounds, \fbHpfFc, ControlSpec(10, 12000, warp:\exponential, default:200),
-	{ arg sl; ~delayFbCtl[\hpfFc].set(sl.value) });
+EZSlider(w, ~gui_row_bounds, \fbAmt, ControlSpec(-60, 0), {
+	arg sl; ~delayFbCtl[\amt].set(sl.value.dbamp) });
+EZSlider(w, ~gui_row_bounds, \fbLfpFc, ControlSpec(10, 12000, warp:\exponential, default:8000), {
+	arg sl; ~delayFbCtl[\lpfFc].set(sl.value) });
+EZSlider(w, ~gui_row_bounds, \fbHpfFc, ControlSpec(10, 12000, warp:\exponential, default:200), {
+	arg sl; ~delayFbCtl[\hpfFc].set(sl.value) });
 
 
 

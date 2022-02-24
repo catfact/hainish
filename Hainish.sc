@@ -1,4 +1,5 @@
 
+
 /////////////////
 /// full instrument
 Hainish {
@@ -80,7 +81,7 @@ Hainish {
 		addPatch = { arg src, dst, scale=1.0;
 			var k = (src.asString ++ "_" ++ dst.asString).asSymbol;
 			controls[\patches][k] = Bus.control(server, 1);
-			controls[\patches][k].set(0.5);
+			controls[\patches][k].set(1.0);
 			patches[k] = {
 				Out.ar(sinks[dst].index,
 					In.kr(controls[\patches][k].index).lag(0.1) * In.ar(sources[src].index, 2) * scale);
@@ -90,10 +91,9 @@ Hainish {
 		addPatch.value(\voice,     \resonator, 1.0 / numUpperVoices);
 		addPatch.value(\resonator, \delay);
 		addPatch.value(\bass,      \delay, 0.2);
-
 		addPatch.value(\bass,      \output, 0.2);
 		addPatch.value(\resonator, \output, 0.6);
-		addPatch.value(\delay,    \output, 2.0);
+		addPatch.value(\delay,    \output, 1.0);
 
 		//------------------------------
 		/// "delay" feedback
@@ -120,8 +120,6 @@ Hainish {
 		patches[\output_system] = { Out.ar(0, In.ar(sinks[\output], 2)) }.play(server, addAction:\addToTail);
 
 	}
-
-
 }
 
 //////////////////////
@@ -165,7 +163,7 @@ Hainish_Delay {
 		ctlBusIdx = Dictionary.new;
 
 		this.class.specs.keys.do({ arg k, i;
-			[k, i].postln;
+			//[k, i].postln;
 			ctlBusIdx[k] = ctlBus.index + i;
 			ctlBus.subBus(i).set(specs[k].default);
 		});
@@ -292,9 +290,11 @@ Hainish_VoiceOsc {
 		^super.new.init(target, output, controls, modIn);
 	}
 
+
 	// `controls` should be a structure returned by *controls
 	init { arg target, output, controls, modIn;
 
+		// FIXME: def compilation should be memoized
 		synth = {
 			arg gate=0, hz=110, fastGate=1;
 			var osc, aosc, aenv, snd;
@@ -480,7 +480,7 @@ Hainish_Resonator {
 				\sat3,  satSpec,
 			]);
 		});
-		prSpecs.postln;
+		//prSpecs.postln;
 		^prSpecs
 	}
 
@@ -501,7 +501,7 @@ Hainish_Resonator {
 		ctlBusIdx = Dictionary.new;
 
 		this.class.specs.keys.do({ arg k, i;
-			[k, i].postln;
+			//[k, i].postln;
 			ctlBusIdx[k] = ctlBus.index + i;
 			ctlBus.subBus(i).set(specs[k].default);
 		});
@@ -553,7 +553,7 @@ classvar prSpecs;
 				\phaseSpread, ControlSpec(0, 1, default:1)
 			]);
 		});
-		prSpecs.postln;
+		//prSpecs.postln;
 		^prSpecs
 	}
 
@@ -603,3 +603,6 @@ classvar prSpecs;
 	}
 
 }
+
+//// TODO:
+// refactoring 
